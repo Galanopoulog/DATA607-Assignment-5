@@ -1,0 +1,145 @@
+---
+title: "Assignment 5 - Tidying and Transforming Data"
+author: "Georgia Galanopoulos"
+date: "March 5, 2017"
+output: html_document
+---
+
+```{r}
+library(knitr)
+library(stringr)
+library(ggplot2)
+library(tidyr)
+library(dplyr)
+```
+
+
+
+###**Create a .csv file called "Airlines.csv" and write it out to your set directory.**
+```{r}
+airlines = matrix(c("Alaska","on time", 497, 221,212,503,1841,
+                "", "delayed",62,12,20,102,305,
+                 "","","","","","","",
+                "AMWest","on time",694,4840,383,320,201,
+                "","delayed",117,415,65,129,61
+                 ),ncol=7,byrow=TRUE)
+colnames(airlines) = c("","", "Los Angeles", "Phoenix", "San Diego", "San Francisco", "Seattle")
+airlines = data.frame(airlines)
+airlines
+
+# getwd()
+write.csv(airlines, file = "Airlines.csv", row.names = F)
+```
+
+
+
+###**Read the "Airlines.csv" file into R.**
+```{r}
+planes = read.csv("Airlines.csv")
+planes
+```
+
+
+
+###**Use tidyr and dplyr to tidy and transform data.**
+
+Remove empty row and fill in empty cells.
+```{r}
+planes = filter(planes, !is.na(Los.Angeles))
+planes$V1[2] = "Alaska"
+planes$V1[4] = "AMWest"
+planes
+```
+
+Rearrange columns and rows by stacking the cities into one column and then making the Delayed and Timely flights into two columns, each with its own values. Rename columns. Edit city names to replace the "." with a space. Calculate percentages and means.
+```{r}
+# Rearrange columns and rows
+planes = planes %>%  gather("Cities", "Flights", 3:7) %>% 
+spread(V2 , Flights)
+
+# Rename columns
+colnames(planes) = c("Airline", "City", "Delayed", "Timely")
+
+# Edit city names
+planes$City = str_replace_all(planes$City, "[.]", " ")
+
+# Ratio of Delayed to Timely arrivals
+planes = mutate(planes, Ratio = round((Delayed/Timely),2))
+# Percent of Delayed and Timely arrivals 
+planes = mutate(planes, Percent_Delayed = round((Delayed/(Delayed+Timely))*100,2))
+planes = mutate(planes, Percent_Timely = round((Timely/(Delayed+Timely))*100,2))
+
+kable(planes)
+```
+
+
+###**Perform analysis to compare timely arrivals and delays for the two airlines.**
+
+Create a table of means and means of percentages of delays and timely arrivals.
+```{r}
+# Means and Sums of Delayed vs Timely by Airline
+kable(planes %>% 
+  group_by(Airline) %>% 
+  summarise(Mean_Delays = mean(Delayed),
+            Mean_Timely = mean(Timely),
+            Mean_Percent_Delays = mean(Percent_Delayed),
+            Mean_Percent_Timely = mean(Percent_Timely),
+            Sum_Delays = sum(Delayed),
+            Sum_Timely = sum(Timely),
+            Total_Flights = sum(Sum_Delays, Sum_Timely)))
+```
+
+Here, we see that AMWest has twice as many total flights than Alaska airlines,  however Alaska airlines has a higher mean of percent of timely arrivals, meaning that despite having fewer flights, Alaska is less likely to have delays than AMWest.
+
+
+**PLOTS**
+
+*Comparison of the number of delayed flights and on-time flights between the two airlines based on the city.*
+```{r}
+deltim = gather(planes, "Arrival", "n", 3:4 )
+ggplot(deltim, aes(x=Arrival, y=n, colour = Airline)) + 
+  geom_bar( aes(fill= Airline), stat="identity", position=position_dodge())+
+  facet_grid(~ planes$City)
+```
+
+In this plot, we see that the Alaska airline has fewer delays than AMWest in each city except for Seattle. However, it also has fewer on-time arrivals, the exceptions being San Francisco and Seattle. Simply put, AMWest has more traffic than Alaska, especially in Phoenix.
+
+
+
+
+*Comparison of the percentage of delayed flights and on-time flights between the two airlines based on the city.*
+```{r}
+percents = gather(planes, "Percents", "n", 6:7 )
+ggplot(percents, aes(x=Airline, y=n, colour = Percents)) + 
+  geom_bar( aes(fill= Percents), stat="identity", position=position_dodge())+
+  facet_grid(~ planes$City)
+
+```
+
+Because the previous plot could be misleading due to the airplane traffic in each city, viewing the percentages of flight arrivals could be more helpful. In this plot, we see that the Alaska airline has a lower percentage of delays than AMWest in every city. Regardless of which city is picked (one with a lot of traffic like Phoenix or one with fewer flights like San Diego), the Alaska airline is more likely to arrive on time than AMWest.
+
+
+
+
+*Comparison of the number of delayed and on-time flights between cities based on the airline.*
+```{r}
+ggplot(deltim, aes(x=Arrival, y=n, colour = City)) + 
+  geom_bar( aes(fill= City), stat="identity", position=position_dodge())+
+  facet_grid(~ planes$Airline)
+```
+
+Here we see that the Alaska airline has a stronger base in Seattle than AMWest, while AMWest has a stronger base in Phoenix. On the other hand, the Alaska airline has a weak base in Phoenix and San Diego, while AMWest has the fewest flights in Seattle.
+
+
+
+*Comparison of the percentages of delayed and on-time flights between cities based on the airline.* 
+```{r}
+ggplot(percents, aes(x=Percents, y=n, colour = City)) + 
+  geom_bar( aes(fill= City), stat="identity", position=position_dodge())+
+  facet_grid(~ planes$Airline)
+```
+
+When viewing the percentages of delayed and timely arrivals among the cities, we see that the Alaska airline has its highest Timely percentage in Phoenix and its higher percentage of delays in San Francisco. AMWest also has its higher Timely percentage in Phoenix (even if it is not as high as Alaska's percentage) and has its highest percentage of delays in San Francisco (a higher percentage than Alaska).
+
+ 
+**To summarize:** Alaska airlines has its most flights in Seattle but its highest percentage of timely arrivals in Phoenix. Conversly, it has its fewest flights in Phoenix and San Diego even though its highest percentage of delays are in San Francisco. AMWest, on the other hand has its most flights and its highest percentagy of timely arrivals in Phoenix (though Alaska has a higher timely percentage comparatively). On the other hand, it has the least traffic in Seattle and the highest percentage of delays in San Francisco (higher comparatively even to the Alaska airline). Overall, though, when viewing the timely and delayed percentages side by side, even though the Alaska airline is consistently higher than AMWest, AMWest is not too far behind in terms of on-time percentages.
